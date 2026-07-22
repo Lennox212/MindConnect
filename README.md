@@ -1,14 +1,8 @@
 # Student Curriculum AI
 
-Student Curriculum AI is an AI-powered academic planning platform built with Django that helps students plan their degree path more efficiently. By analyzing a student's completed coursework and curriculum requirements, the application provides personalized course recommendations and academic guidance to support informed semester planning.
+Student Curriculum AI is an AI-powered academic planning platform built with Django that helps students navigate their degree requirements, monitor academic progress, and make informed decisions about future coursework. By analyzing completed courses and curriculum requirements, the application generates personalized course recommendations and academic guidance using OpenAI.
 
-The platform combines full-stack web development, Firebase Authentication, and OpenAI integration to deliver an intelligent advising experience that simplifies curriculum navigation and helps students stay on track toward graduation.
-
----
-
-## Project Status
-
-This project is actively under development as part of my software engineering portfolio. The current implementation includes secure authentication, curriculum management, AI-assisted academic advising, and personalized course recommendations. Additional features and enhancements will continue to be added as the project evolves.
+The platform combines full-stack web development, Firebase Authentication, and artificial intelligence to provide an intelligent advising experience that simplifies curriculum planning and helps students stay on track toward graduation.
 
 ---
 
@@ -19,16 +13,15 @@ This project is actively under development as part of my software engineering po
 - Personalized course recommendations based on completed coursework
 - AI-generated academic guidance for semester planning
 - Intelligent curriculum navigation
-- Degree progression assistance using OpenAI
+- Degree progression analysis using OpenAI
 - Personalized recommendations tailored to each student's academic history
 
 ### Student Management
 
-- Student Registration
-- Secure Login
-- Firebase Authentication
-- Student Profile Management
-- Personalized Dashboard
+- Student registration and authentication
+- Secure login with Firebase Authentication
+- Student profile management
+- Personalized dashboard
 
 ### Curriculum Planning
 
@@ -40,11 +33,12 @@ This project is actively under development as part of my software engineering po
 
 ### Backend Functionality
 
-- Django MVC Architecture
-- Database Integration
-- Form Validation
-- Secure Authentication
-- Modular Application Design
+- Django MVC architecture
+- Firebase integration
+- Secure authentication
+- Database management
+- Form validation
+- Modular application design
 
 ---
 
@@ -56,45 +50,20 @@ This project is actively under development as part of my software engineering po
 | Framework | Django |
 | Authentication | Firebase Authentication |
 | Artificial Intelligence | OpenAI API |
-| Database | SQLite (Development) |
+| Database | SQLite |
 | Frontend | HTML, CSS, JavaScript |
 | Additional Services | Firebase |
-
----
-
-## Project Structure
-
-```text
-StudentCurriculumAI
-│
-├── StudentCurriculum/
-├── accounts/
-│   ├── management/
-│   ├── migrations/
-│   ├── templates/
-│   ├── static/
-│   ├── models.py
-│   ├── views.py
-│   ├── forms.py
-│   ├── urls.py
-│   └── firebase_auth_service.py
-│
-├── templates/
-├── static/
-├── manage.py
-└── requirements.txt
-```
 
 ---
 
 ## How It Works
 
 1. Students create an account using Firebase Authentication.
-2. They record completed coursework and academic information.
-3. The application compares completed courses against degree requirements.
+2. Completed coursework and academic information are stored securely.
+3. The application compares completed courses with degree requirements.
 4. OpenAI analyzes the student's academic progress.
 5. Personalized course recommendations and academic guidance are generated.
-6. Students use these recommendations to plan future semesters and monitor progress toward graduation.
+6. Students use these recommendations to build future semester schedules and monitor graduation progress.
 
 ---
 
@@ -121,7 +90,7 @@ pip install -r requirements.txt
 
 ### Configure Environment Variables
 
-Create a `.env` file containing your credentials:
+Create a `.env` file:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key
@@ -132,9 +101,6 @@ FIREBASE_CREDENTIALS=your_firebase_credentials
 
 ```bash
 python manage.py migrate
-```
-
-```bash
 python manage.py runserver
 ```
 
@@ -148,8 +114,6 @@ http://127.0.0.1:8000
 
 ## Skills Demonstrated
 
-This project demonstrates experience with:
-
 - Python
 - Django
 - Firebase Authentication
@@ -159,28 +123,25 @@ This project demonstrates experience with:
 - Authentication & Authorization
 - AI-Assisted Decision Support
 - Software Architecture
-- REST API Integration
 
 ---
 
 ## Future Enhancements
 
-Planned improvements include:
-
 - Interactive degree progress visualization
-- Support for multiple universities
+- Multi-university curriculum support
 - Faculty and advisor portal
-- AI chat assistant for academic advising
+- AI chat assistant
 - Automatic prerequisite validation
 - Exportable academic plans
 - Docker deployment
-- Comprehensive unit and integration testing
+- Unit and integration testing
 
 ---
 
 ## About
 
-Student Curriculum AI was developed as part of my software engineering portfolio to demonstrate the integration of artificial intelligence into a practical educational application. By combining Django, Firebase, and OpenAI, the project showcases how AI can be used to provide personalized academic recommendations and improve the student planning experience.
+Student Curriculum AI was developed as part of my software engineering portfolio to demonstrate the integration of artificial intelligence into a real-world educational platform. The application combines Django, Firebase, and OpenAI to provide personalized academic recommendations and streamline curriculum planning.
 
 ---
 
@@ -190,4 +151,4 @@ Student Curriculum AI was developed as part of my software engineering portfolio
 
 Computer Engineering Graduate
 
-Python • Django • Firebase • OpenAI • Full-Stack Development
+Java • Python • Django • Spring Boot • AI Integration • Full-Stack Development
