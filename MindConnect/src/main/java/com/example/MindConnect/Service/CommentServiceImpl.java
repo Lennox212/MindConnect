@@ -1,5 +1,6 @@
 package com.example.MindConnect.Service;
 
+import com.example.MindConnect.CustomExceptions.*;
 import com.example.MindConnect.Entity.CommentEntity;
 import com.example.MindConnect.Entity.PostEntity;
 import com.example.MindConnect.Entity.UserEntity;
@@ -39,37 +40,40 @@ public class CommentServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found"));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
 
 
         if(user.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("You are not allowed to use this feature.");
+            throw new AccountInactiveException("You are not allowed to use this feature.");
         }
 
         PostEntity post = postRepository.findById(request.getPostID())
-                .orElseThrow(()->new RuntimeException("Post with entered ID does not exist!"));
+                .orElseThrow(()->new PostNotFoundException("Post with entered ID does not exist!"));
 
-        if(request.getContent() == null){
-            throw new RuntimeException("Comment content cannot be empty");
+        if(request.getContent() == null || request.getContent().isBlank()){
+            throw new BlankFieldException("Comment content cannot be empty");
         }
 
 
 
         CommentEntity comment = CommentEntity.builder()
                 .post(post)
-                .comment(request.getContent())
+                .content(request.getContent().trim())
                 .commentedAt(LocalDateTime.now())
                 .commentedBy(user)
                 .build();
 
+
         CommentEntity savedComment = commentsRepository.save(comment);
+
 
         CreateCommentResponse response = CreateCommentResponse.builder()
                 .postID(request.getPostID())
                 .commentID(savedComment.getId())
                 .authorName(savedComment.getCommentedBy().getFirstName() + " " + savedComment.getCommentedBy().getLastName())
-                .content(savedComment.getComment())
+                .content(savedComment.getContent())
                 .commentedAt(savedComment.getCommentedAt())
+                .ownedByCurrentUser(true)
                 .message("Comment posted successfully")
                 .build();
         return response;
@@ -78,17 +82,25 @@ public class CommentServiceImpl {
 
     public List<GetCommentsByPostResponse> getCommentsByPost(UUID postID){
 
-        PostEntity post = postRepository.findById(postID).orElseThrow(()-> new RuntimeException("Post not found"));
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-         List<CommentEntity> comments = commentsRepository.findByPost(post);
+        PostEntity post = postRepository.findById(postID).orElseThrow(()-> new PostNotFoundException("Post not found"));
+
+         List<CommentEntity> comments = commentsRepository.findByPostOrderByCommentedAtAsc(post);
 
          List<GetCommentsByPostResponse> allComments = new ArrayList<>();
 
+
+
          for(CommentEntity comment: comments) {
-             GetCommentsByPostResponse response = GetCommentsByPostResponse.builder()
+
+             boolean ownedByCurrentUser = comment.getCommentedBy().getEmail().equals(email);
+
+                     GetCommentsByPostResponse response = GetCommentsByPostResponse.builder()
                      .commentID(comment.getId())
                      .authorName(comment.getCommentedBy().getFirstName() + " " + comment.getCommentedBy().getLastName())
-                     .content(comment.getComment())
+                     .content(comment.getContent())
+                     .ownedByCurrentUser(ownedByCurrentUser)
                      .commentedAt(comment.getCommentedAt())
                      .build();
 
@@ -105,23 +117,23 @@ public class CommentServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found"));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
 
         if(user.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("You are not allowed to use this feature");
+            throw new AccountInactiveException("You are not allowed to use this feature");
 
         }
 
-        List<CommentEntity> comments_by_user = commentsRepository.findByCommentedBy(user);
+        List<CommentEntity> userComments = commentsRepository.findByCommentedBy(user);
 
         List<GetCommentsByUserResponse> comments = new ArrayList<>();
 
-        for(CommentEntity comment: comments_by_user){
+        for(CommentEntity comment: userComments){
             GetCommentsByUserResponse response = GetCommentsByUserResponse.builder()
                     .authorName(comment.getCommentedBy().getFirstName() + " " + comment.getCommentedBy().getLastName())
                     .commentID(comment.getId())
                     .postID(comment.getPost().getId())
-                    .content(comment.getComment())
+                    .content(comment.getContent())
                     .commentedAt(comment.getCommentedAt())
                     .updatedAt(comment.getUpdatedAt())
                     .build();
@@ -142,34 +154,34 @@ public class CommentServiceImpl {
 
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found"));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
 
         if(user.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("You are not allowed to use this feature");
+            throw new AccountInactiveException("You are not allowed to use this feature");
         }
 
-        CommentEntity comment = commentsRepository.findById(request.getCommentId())
-                .orElseThrow(()->new RuntimeException("Comment not found"));
+        CommentEntity comment = commentsRepository.findById(request.getCommentID())
+                .orElseThrow(()->new CommentNotFoundException("Comment not found"));
 
         if(comment.getCommentedBy().getEmail().equals(email)){
 
-            if(request.getNewContent() == null) {
+            if(request.getNewContent() == null || request.getNewContent().isBlank()) {
 
-                throw new RuntimeException("Comment cannot be empty");
+                throw new BlankFieldException("Comment cannot be empty");
             }
 
-                comment.setComment(request.getNewContent());
+                comment.setContent(request.getNewContent().trim());
                 comment.setUpdatedAt(LocalDateTime.now());
                 commentsRepository.save(comment);
             }
         else{
-            throw new RuntimeException("You are not allowed to edit this comment.");
+            throw new NotAuthorizedException("You are not allowed to edit this comment.");
         }
 
         UpdateCommentResponse response = UpdateCommentResponse.builder()
-                .commentId(comment.getId())
+                .commentID(comment.getId())
                 .authorName(comment.getCommentedBy().getFirstName()+ " " + comment.getCommentedBy().getLastName())
-                .content(comment.getComment())
+                .content(comment.getContent())
                 .updateAt(comment.getUpdatedAt())
                 .message("Comment updated successfully")
                 .build();
@@ -184,23 +196,23 @@ public class CommentServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found"));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
 
 
         if(user.getStatus() != AccountStatus.ACTIVE){
 
-            throw new RuntimeException("You are not allowed to use this feature");
+            throw new AccountInactiveException("You are not allowed to use this feature");
         }
 
         CommentEntity comment = commentsRepository.findById(commentID)
-                .orElseThrow(()->new RuntimeException("Comment not found"));
+                .orElseThrow(()->new CommentNotFoundException("Comment not found"));
 
 
             if(comment.getCommentedBy().getEmail().equals(email)){
 
                 commentsRepository.delete(comment);
             }else {
-                throw new RuntimeException("You are not allowed to delete this comment.");
+                throw new NotAuthorizedException("You are not allowed to delete this comment.");
             }
         DeleteCommentResponse response = DeleteCommentResponse.builder()
                 .commentID(commentID)

@@ -1,13 +1,13 @@
 package com.example.MindConnect.Controller;
 
 import com.example.MindConnect.Entity.UserEntity;
+import com.example.MindConnect.Payload.Request.RefreshTokenRequest.RefreshTokenRequest;
 import com.example.MindConnect.Payload.Request.UserRequests.*;
-import com.example.MindConnect.Payload.Response.UserResponses.JwtResponse;
-import com.example.MindConnect.Payload.Response.UserResponses.OtpResponse;
-import com.example.MindConnect.Payload.Response.UserResponses.UserCreationResponse;
+import com.example.MindConnect.Payload.Response.UserResponses.*;
 import com.example.MindConnect.Service.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +23,6 @@ public class UserController {
 
 @PostMapping("/register")
 public UserCreationResponse createUser(@RequestBody UserCreationRequest request){
-    System.out.println("REGISTER ENDPOINT HIT");
     return userService.createUser(request);
 
 }
@@ -81,6 +80,29 @@ public OtpResponse changePassword(@RequestBody ChangePasswordRequest request){
 @PostMapping("/update-profile")
 public OtpResponse updateProfile(@RequestBody UpdateProfileRequest request){
     return userService.updateProfile(request);
+}
+
+@GetMapping("/me")
+    public GetCurrentUserResponse getCurrentUser(){
+
+    return userService.getCurrentUser();
+}
+
+@PostMapping("/refresh")
+    public JwtResponse refreshAccessToken(@RequestBody RefreshTokenRequest request){
+
+    return userService.refreshAccessToken(request);
+}
+
+@PostMapping("/log-out")
+public OtpResponse logOut(@RequestBody RefreshTokenRequest request){
+    return userService.logOut(request);
+}
+
+@PutMapping("/update-profile-picture")
+public UpdateProfilePictureResponse updateProfilePicture(@RequestParam("profilePicture") MultipartFile profilePicture){
+
+    return userService.updateProfilePicture(profilePicture);
 }
 
 

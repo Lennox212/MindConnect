@@ -1,32 +1,33 @@
 package com.example.MindConnect.Service;
 
 import com.example.MindConnect.Config.JwtGenerator;
+import com.example.MindConnect.CustomExceptions.*;
 import com.example.MindConnect.Entity.AccountDeactivationEntity;
+import com.example.MindConnect.Entity.RefreshTokenEntity;
 import com.example.MindConnect.Entity.UserEntity;
 import com.example.MindConnect.Enums.AccountStatus;
 import com.example.MindConnect.Enums.Role;
+import com.example.MindConnect.Payload.Request.RefreshTokenRequest.RefreshTokenRequest;
 import com.example.MindConnect.Payload.Request.UserRequests.*;
-import com.example.MindConnect.Payload.Response.UserResponses.JwtResponse;
-import com.example.MindConnect.Payload.Response.UserResponses.UserCreationResponse;
-import com.example.MindConnect.Payload.Response.UserResponses.OtpResponse;
+import com.example.MindConnect.Payload.Response.UserResponses.*;
 import com.example.MindConnect.Repository.AccountDeactivationRepository;
 import com.example.MindConnect.Repository.UserRepository;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationContextException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@Data
+@Slf4j
 @RequiredArgsConstructor
 
 
@@ -47,13 +48,16 @@ public class UserServiceImpl {
 
     private final AccountDeactivationRepository deactivationRepository;
 
+    private final RefreshTokenServiceImpl refreshTokenService;
+
+    private final S3Service s3Service;
+
     public UserCreationResponse createUser(UserCreationRequest request) {
 
-        //TODO--CUSTOM EXCEPTIONS
 
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalStateException("User with the provided details already exists");
+            throw new UserAlreadyExistsException("User with the provided details already exists");
         }
 
         UserEntity user = UserEntity.builder()
@@ -83,8 +87,8 @@ public class UserServiceImpl {
     }
 
     public UserCreationResponse getUserByID(UUID id) {
-//TODO--CUSTOM EXCEPTIONS
-        UserEntity found_user = userRepository.findById(id).orElseThrow(() -> new RuntimeException("404! User with ID entered not found!"));
+
+        UserEntity found_user = userRepository.findById(id).orElseThrow(() -> new UserNotFoundException("User with ID entered not found!"));
 
         UserCreationResponse response = UserCreationResponse.builder()
                 .firstName(found_user.getFirstName())
@@ -108,27 +112,27 @@ public class UserServiceImpl {
 
 
         UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(()->new RuntimeException("Invalid email or password."));
+                .orElseThrow(()->new InvalidCredentialsException("Invalid credentials. Please try again"));
 
 
 
 
 
             if (user.getStatus() == AccountStatus.INACTIVE) {
-                throw new ApplicationContextException("Account Inactive. Please check your email to active your account");
+                throw new AccountInactiveException("Account Inactive. Please check your email to active your account");
             }
 
             if (user.getStatus() == AccountStatus.FROZEN) {
 
-                throw new ApplicationContextException("Account Frozen. Please contact support!");
+                throw new AccountFrozenException("Account Frozen. Please contact support!");
             }
 
             if (user.getStatus() == AccountStatus.SUSPENDED) {
-                throw new ApplicationContextException("Account suspended. Please check your email for further instructions");
+                throw new AccountSuspendedException("Account suspended. Please check your email for further instructions");
             }
 
             if(user.getStatus() == AccountStatus.DEACTIVATED) {
-                throw new ApplicationContextException("User disabled account.Please re-activate the account to regain access");
+                throw new AccountDeactivatedException("User disabled account.Please re-activate the account to regain access");
             }
 
 
@@ -138,14 +142,16 @@ public class UserServiceImpl {
 
         SecurityContextHolder.getContext().setAuthentication(authentication); //Store the authenticated user as the current user
 
-        String token = jwtGenerator.generateToken(authentication); //generate token
+        String token = jwtGenerator.generateAccessToken(authentication); //generate token
 
+        RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(user);
 
         JwtResponse response = JwtResponse.builder()
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(user.getEmail())
-                .token(token)
+                .accessToken(token)
+                .refreshToken(refreshToken.getToken())
                 .localDateTime(LocalDateTime.now())
                 .message("Login successful!")
                 .build();
@@ -154,9 +160,77 @@ public class UserServiceImpl {
     }
 
 
+
+    public UpdateProfilePictureResponse updateProfilePicture(MultipartFile picture){
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(()-> new UserNotFoundException("User does not exist"));
+
+        String oldObjectKey = user.getProfilePictureKey();
+
+        String newObjectKey = s3Service.uploadFile(picture);
+
+        try {
+            user.setProfilePictureKey(newObjectKey);
+            userRepository.save(user);
+        } catch (Exception exception){
+
+            s3Service.deleteFile(newObjectKey);
+
+            throw exception;
+        }
+
+        if (oldObjectKey != null && !oldObjectKey.isBlank()) {
+            try {
+                s3Service.deleteFile(oldObjectKey);
+            } catch (PictureUploadException exception){
+                log.error("Failed to delete old profile picture {}", oldObjectKey, exception);
+            }
+        }
+
+
+        UpdateProfilePictureResponse response = UpdateProfilePictureResponse.builder()
+                .message("Profile picture updated successfully")
+                .localDateTime(LocalDateTime.now())
+                .build();
+
+        return response;
+
+
+
+
+    }
+
+    public JwtResponse refreshAccessToken(RefreshTokenRequest request){
+
+        String refreshToken = request.getRefreshToken();
+
+        RefreshTokenEntity refreshTokenEntity = refreshTokenService.validateRefreshToken(refreshToken);
+
+        UserEntity user = refreshTokenEntity.getUser();
+
+
+        String accessToken = jwtGenerator.generateAccessToken(user);
+
+        JwtResponse response = JwtResponse.builder()
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .message("Access token generated successfully")
+                .localDateTime(LocalDateTime.now())
+                .build();
+        return response;
+
+    }
+
+
     public OtpResponse sendPasswordResetOtp(SendOtpRequest request) {
         UserEntity user = userRepository.findByEmail(request.getEmail()).orElseThrow(() ->
-                new RuntimeException("Unable to locate the authenticated user account."));
+                new UserNotFoundException("Unable to locate the authenticated user account."));
 
 
         String otp = otpService.generateOtp(request.getEmail());
@@ -176,7 +250,7 @@ public class UserServiceImpl {
     public OtpResponse verifyOtpAndResetPassword(VerifyOtpRequest request) {
 
         UserEntity user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Unable to locate the authenticated user account."));
+                .orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
 
         if (otpService.validateOtp(request.getEmail(), request.getOtp())) {
@@ -184,7 +258,7 @@ public class UserServiceImpl {
             userRepository.save(user);
             otpService.clearOtp(request.getEmail()); //clear - once used no need to reuse/store it again
         } else {
-            throw new RuntimeException("The OTP entered is incorrect");
+            throw new InvalidOTPException("The OTP entered is incorrect");
         }
 
         OtpResponse response = OtpResponse.builder()
@@ -200,10 +274,10 @@ public class UserServiceImpl {
     public OtpResponse sendAccountActivationOtp(SendOtpRequest request) {
 
         UserEntity user = userRepository.findByEmail(request.getEmail()).
-                orElseThrow(() -> new RuntimeException("Unable to locate the authenticated user account."));
+                orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
         if (user.getStatus() == AccountStatus.ACTIVE) {
-            throw new RuntimeException("Account has already been activated");
+            throw new AccountAlreadyActiveException("Account has already been activated");
         }
 
         String otp = otpService.generateOtp(user.getEmail());
@@ -221,14 +295,14 @@ public class UserServiceImpl {
     public OtpResponse activateAccount(ActivateAccountRequest request) {
 
         UserEntity user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Unable to locate the authenticated user account."));
+                .orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
         if (otpService.validateOtp(request.getEmail(), request.getOtp())) {
             user.setStatus(AccountStatus.ACTIVE);
             userRepository.save(user);
             otpService.clearOtp(request.getEmail());
         } else {
-            throw new RuntimeException("Account could not be activated. Please try again");
+            throw new InvalidOTPException("Account could not be activated. Please try again");
         }
 
         OtpResponse response = OtpResponse.builder()
@@ -245,13 +319,13 @@ public class UserServiceImpl {
         //currently logged user
 
         UserEntity user = userRepository.findByEmail(email).
-                orElseThrow(()->new RuntimeException("Unable to locate the authenticated user account."));
+                orElseThrow(()->new UserNotFoundException("Unable to locate the authenticated user account."));
 
         Boolean match = passwordEncoder.matches(request.getOldPassword(), user.getPassword());
 
 
         if(!match){
-            throw new RuntimeException("Passwords do not match. Please try again");
+            throw new PasswordDoesNotMatchException("Passwords do not match. Please try again");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -270,13 +344,13 @@ public class UserServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()-> new RuntimeException("Unable to locate the authenticated user account."));
+                .orElseThrow(()-> new UserNotFoundException("Unable to locate the authenticated user account."));
 
 
         if(request.getFirstName() != null) {
 
             if(request.getFirstName().isBlank()){
-                throw new RuntimeException("First Name cannot be blank");
+                throw new BlankFieldException("First Name cannot be blank");
             }
 
             user.setFirstName(request.getFirstName());
@@ -287,7 +361,7 @@ public class UserServiceImpl {
         if(request.getLastName() != null) {
 
             if(request.getLastName().isBlank()){
-                throw new RuntimeException("Last Name cannot be blank");
+                throw new BlankFieldException("Last Name cannot be blank");
             }
 
             user.setLastName(request.getLastName());
@@ -322,23 +396,17 @@ public class UserServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Unable to locate the authenticated user account."));
+                .orElseThrow(()->new UserNotFoundException("Unable to locate the authenticated user account."));
 
         if(user.getStatus() == AccountStatus.DEACTIVATED){
-            throw new RuntimeException("Account has already been deactivated");
+            throw new AccountDeactivatedException("Account has already been deactivated");
         }
 
         boolean match = passwordEncoder.matches(request.getPasswordConfirmation(), user.getPassword());
 
         if(!match){
-            throw new RuntimeException("The password entered does not match your current password.");
+            throw new PasswordDoesNotMatchException("The password entered does not match your current password.");
         }
-
-        //TODO soft deactivation - limit users access to app so they can activate themselves
-        //TODO check responses - null
-        //TODO write controller ASAP
-        //TODO - Custom Exceptions
-
 
             AccountDeactivationEntity deactivation = AccountDeactivationEntity.builder()
                     .user(user)
@@ -360,6 +428,53 @@ public class UserServiceImpl {
         return response;
     }
 
+    public GetCurrentUserResponse getCurrentUser(){
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(()->new UserNotFoundException("User not found"));
+
+        String pictureUrl = null;
+
+        if (user.getProfilePictureKey() != null &&
+        !user.getProfilePictureKey().isBlank()){
+
+            pictureUrl = s3Service.generatePresignedUrl(user.getProfilePictureKey());
+        }
+
+
+
+        GetCurrentUserResponse response = GetCurrentUserResponse.builder()
+                .userID(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .profilePictureUrl(pictureUrl)
+                .signUpDate(user.getSignUpDate())
+                .status(user.getStatus())
+                .build();
+
+        return response;
+
+    }
+
+    public OtpResponse logOut(RefreshTokenRequest request){
+
+        String token = request.getRefreshToken();
+
+        refreshTokenService.deleteRefreshToken(token);
+
+        SecurityContextHolder.clearContext();
+
+         OtpResponse response = OtpResponse.builder()
+                 .message("Log out successful")
+                 .timestamp(LocalDateTime.now())
+                 .build();
+
+        return response;
+    }
 
 
 }

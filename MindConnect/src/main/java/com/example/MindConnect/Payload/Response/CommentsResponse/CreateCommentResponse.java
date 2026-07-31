@@ -26,5 +26,7 @@ public class CreateCommentResponse {
 
     private String message;
 
+    private boolean ownedByCurrentUser;
+
 
 }

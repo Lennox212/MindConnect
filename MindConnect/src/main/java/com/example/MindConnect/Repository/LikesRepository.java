@@ -12,7 +12,7 @@ import java.util.UUID;
 public interface LikesRepository extends JpaRepository<LikesEntity, UUID> {
 
 
-    Boolean existsByLikedByAndPostLiked(UserEntity user, PostEntity post);
+    boolean existsByLikedByAndPostLiked(UserEntity user, PostEntity post);
 
     Long countByPostLiked(PostEntity post);
 

@@ -40,28 +40,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         System.out.println("AUTH HEADER: " + request.getHeader("Authorization"));
         System.out.println("TOKEN: " + token);
-        System.out.println("VALID: " + (StringUtils.hasText(token) && jwtGenerator.validateToken(token)));
+        //System.out.println("VALID: " + (StringUtils.hasText(token) && jwtGenerator.validateToken(token)));
+
+        try{
+            if(StringUtils.hasText(token) && jwtGenerator.validateToken(token)) {
+                String username = jwtGenerator.getUsername(token);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
 
-        if(StringUtils.hasText(token) && jwtGenerator.validateToken(token)){
-            String username = jwtGenerator.getUsername(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                List<String> authorities = jwtGenerator.extractAuthorities(token);
+
+                List<GrantedAuthority> grantedAuthorities = authorities.stream()
+                        .map(SimpleGrantedAuthority::new).collect(Collectors.toList()); // ::method reference. stream = loop
 
 
-            List<String> authorities = jwtGenerator.extractAuthorities(token);
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, grantedAuthorities);
 
-            List<GrantedAuthority> grantedAuthorities = authorities.stream()
-                    .map(SimpleGrantedAuthority::new).collect(Collectors.toList()); // ::method reference. stream = loop
-
-
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails,null, grantedAuthorities);
-
-            authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
 
-        }
-
+            } }catch (RuntimeException exception){
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Your session has expired or the token is invalid.\"}");
+                return;
+            }
         filterChain.doFilter(request, response);
 
 

@@ -92,6 +92,8 @@ public class UserEntity extends BaseClass{
 
     private String mentalCondition;
 
+    private String profilePictureKey;
+
 
 
 

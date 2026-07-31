@@ -8,6 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Entity
@@ -40,7 +41,7 @@ public class PostEntity extends BaseClass{
 
 
     @JoinColumn(name = "author_id")
-    @ManyToOne
+    @ManyToOne(optional = false)
     private UserEntity author;
 
     private String content;

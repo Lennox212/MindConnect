@@ -23,5 +23,7 @@ public class GetCommentsByPostResponse {
 
     private LocalDateTime commentedAt;
 
+    private boolean ownedByCurrentUser;
+
 
 }

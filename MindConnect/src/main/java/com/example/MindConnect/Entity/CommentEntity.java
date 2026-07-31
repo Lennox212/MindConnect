@@ -1,12 +1,11 @@
 package com.example.MindConnect.Entity;
 
-
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Getter
@@ -22,16 +21,17 @@ public class CommentEntity extends BaseClass{
 
 
     @JoinColumn(name = "commented_by_id")
-    @ManyToOne
+    @ManyToOne(optional = false)
     private UserEntity commentedBy;
 
     @JoinColumn(name = "post_id")
-    @ManyToOne
+    @ManyToOne(optional = false)
     private PostEntity post;
 
     private LocalDateTime updatedAt;
 
-    private String comment;
+    @NotBlank
+    private String content;
 
     private LocalDateTime commentedAt;
 

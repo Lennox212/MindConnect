@@ -1,12 +1,14 @@
 package com.example.MindConnect.Service;
 
+import com.example.MindConnect.CustomExceptions.*;
 import com.example.MindConnect.Entity.PostEntity;
 import com.example.MindConnect.Entity.UserEntity;
 import com.example.MindConnect.Enums.AccountStatus;
+import com.example.MindConnect.Enums.PostVisibility;
 import com.example.MindConnect.Payload.Request.PostsRequest.CreatePostRequest;
-import com.example.MindConnect.Payload.Request.PostsRequest.DeletePostRequest;
 import com.example.MindConnect.Payload.Request.PostsRequest.UpdatePostByIdRequest;
 import com.example.MindConnect.Payload.Response.PostsResponse.*;
+import com.example.MindConnect.Repository.LikesRepository;
 import com.example.MindConnect.Repository.PostRepository;
 import com.example.MindConnect.Repository.UserRepository;
 import lombok.Data;
@@ -29,6 +31,8 @@ public class PostServiceImpl {
 
     private final UserRepository userRepository;
 
+    private final LikesRepository likesRepository;
+
 
 
     public CreatePostResponse createPost(CreatePostRequest request){
@@ -36,10 +40,14 @@ public class PostServiceImpl {
        String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
        UserEntity user = userRepository.findByEmail(email)
-               .orElseThrow(()->new RuntimeException("Authenticated user not found."));
+               .orElseThrow(()->new UserNotFoundException("Authenticated user not found."));
 
        if(user.getStatus() != AccountStatus.ACTIVE){
-           throw new RuntimeException("You are not allowed access to this feature");
+           throw new AccountInactiveException("You are not allowed access to this feature");
+       }
+
+       if(request.getContent().isBlank()){
+           throw new BlankFieldException("Post field cannot be empty");
        }
 
         PostEntity post = PostEntity.builder()
@@ -70,7 +78,7 @@ public class PostServiceImpl {
     public GetPostsByIdResponse getPostsById(UUID id){
 
        PostEntity post = postRepository.findById(id)
-               .orElseThrow(()-> new RuntimeException("Post with entered ID does not exist!"));
+               .orElseThrow(()-> new PostNotFoundException("Post with entered ID does not exist!"));
 
        GetPostsByIdResponse response = GetPostsByIdResponse.builder()
                .postId(post.getId())
@@ -97,11 +105,11 @@ public class PostServiceImpl {
 
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found."));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found."));
 
 
         if(user.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("You must have an active account to access posts.");
+            throw new AccountInactiveException("You must have an active account to access posts.");
         }
 
         List<PostEntity> allPosts = postRepository.findAll();
@@ -133,10 +141,10 @@ public class PostServiceImpl {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found."));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found."));
 
         if(user.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("You must have an active account to access posts.");
+            throw new AccountInactiveException("You must have an active account to access posts.");
         }
 
         List<PostEntity> postsByUser = postRepository.findByAuthor(user);
@@ -163,21 +171,61 @@ public class PostServiceImpl {
 
     }
 
+    public List<GetPostsByVisibilityResponse> getFeedPosts() {
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotAuthorizedException("Authenticated user not found."));
+
+        if (user.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountInactiveException("You must have an active account to access posts.");
+        }
+
+        List<PostEntity> visiblePosts =
+                postRepository.findByVisibilityOrderByPostedAtDesc(PostVisibility.PUBLIC);
+
+        List<GetPostsByVisibilityResponse> responses = new ArrayList<>();
+
+        for (PostEntity post : visiblePosts) {
+            GetPostsByVisibilityResponse response = GetPostsByVisibilityResponse.builder()
+                    .postID(post.getId())
+                    .authorName(
+                            post.getAuthor().getFirstName()
+                                    + " "
+                                    + post.getAuthor().getLastName()
+                    )
+                    .content(post.getContent())
+                    .visibility(post.getVisibility())
+                    .postedAt(post.getPostedAt())
+                    .likesCount(post.getLikes().size())
+                    .commentsCount(post.getComments().size())
+                    .ownedByCurrentUser(post.getAuthor().getEmail().equals(email))
+                    .likedByCurrentUser(likesRepository.existsByLikedByAndPostLiked(user, post))
+                    .build();
+
+            responses.add(response);
+        }
+
+        return responses;
+    }
+
     public UpdatePostsResponse updatePosts(UpdatePostByIdRequest request){
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found."));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found."));
 
         if((user.getStatus() != AccountStatus.ACTIVE)){
 
-            throw new RuntimeException("You must have an active account to update posts");
+            throw new AccountInactiveException("You must have an active account to update posts");
         }
 
 
         PostEntity post = postRepository.findById(request.getPostID())
-                .orElseThrow(()->new RuntimeException("Post not found"));
+                .orElseThrow(()->new PostNotFoundException("Post not found"));
 
 
 
@@ -185,7 +233,7 @@ public class PostServiceImpl {
 
             if(request.getNewContent() != null){
                if(request.getNewContent().isBlank()){
-                   throw new RuntimeException("Post content cannot be blank");
+                   throw new BlankFieldException("Post content cannot be blank");
                }
                 post.setContent(request.getNewContent());
             }
@@ -197,7 +245,7 @@ public class PostServiceImpl {
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
         }else{
-            throw new RuntimeException("You are not authorized to update this post");
+            throw new NotAuthorizedException("You are not authorized to update this post");
         }
 
         UpdatePostsResponse response = UpdatePostsResponse.builder()
@@ -220,22 +268,22 @@ public class PostServiceImpl {
 
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new RuntimeException("Authenticated user not found"));
+                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
 
         if(user.getStatus() != AccountStatus.ACTIVE){
 
-            throw new RuntimeException("Your account must be active to delete posts.");
+            throw new AccountInactiveException("Your account must be active to delete posts.");
         }
 
         PostEntity post = postRepository.findById(id)
-                .orElseThrow(()->new RuntimeException("Post not found"));
+                .orElseThrow(()->new PostNotFoundException("Post not found"));
 
 
         if(post.getAuthor().getEmail().equals(email)){
 
             postRepository.delete(post);
         }else{
-            throw new RuntimeException("You are not authorized to delete this post");
+            throw new NotAuthorizedException("You are not authorized to delete this post");
         }
 
         DeletePostResponse response = DeletePostResponse.builder()

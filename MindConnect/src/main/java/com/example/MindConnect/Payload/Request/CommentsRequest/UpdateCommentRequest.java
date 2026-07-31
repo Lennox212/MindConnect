@@ -14,7 +14,7 @@ import java.util.UUID;
 public class UpdateCommentRequest {
 
 
-    private UUID commentId;
+    private UUID commentID;
 
     private String newContent;
 }

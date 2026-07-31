@@ -1,5 +1,6 @@
 package com.example.MindConnect.Config;
 
+import com.example.MindConnect.Entity.UserEntity;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -25,11 +26,16 @@ public class JwtGenerator {
     @Value("${app.jwt-secret}")
     private String jwtSecret; //generate token using a website
 
+    @Value("${app.jwt-refresh-expiration}")
+    private Long refreshExpiration;
+
+
     @Value("${app.jwt-expiration}")
     private Long jwtExpiration;
 
 
-    public String generateToken(Authentication authentication){
+    public String generateAccessToken(Authentication authentication){
+        //Authentication anybody can use it, default SpringBoot
 
         String username = authentication.getName();
         Date currentDate = new Date();
@@ -49,6 +55,44 @@ public class JwtGenerator {
                 .signWith(key())
                 .compact();
 
+    }
+
+    public String generateAccessToken(UserEntity user){
+        //UserEntity custom for this application
+
+
+        Date currentDate = new Date();
+        Date expirationDate = new Date(currentDate.getTime() + jwtExpiration);
+
+
+
+
+        List<String> authorities = List.of(user.getRole().name());
+
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .claim("authorities", authorities)
+                .setIssuedAt(currentDate)
+                .setExpiration(expirationDate)
+                .signWith(key())
+                .compact();
+
+
+
+    }
+
+    public String generateRefreshToken(UserEntity user){
+
+        Date currentDate = new Date();
+
+        Date expiration = new Date(currentDate.getTime() + refreshExpiration);
+
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .setIssuedAt(currentDate)
+                .setExpiration(expiration)
+                .signWith(key())
+                .compact();
     }
 
     private Key key(){

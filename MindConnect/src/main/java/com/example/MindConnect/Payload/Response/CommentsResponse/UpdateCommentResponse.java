@@ -17,7 +17,7 @@ import java.util.UUID;
 
 public class UpdateCommentResponse {
 
-    private UUID commentId;
+    private UUID commentID;
 
     private String authorName;
 

@@ -1,7 +1,6 @@
 package com.example.MindConnect.Controller;
 
 import com.example.MindConnect.Payload.Request.PostsRequest.CreatePostRequest;
-import com.example.MindConnect.Payload.Request.PostsRequest.DeletePostRequest;
 import com.example.MindConnect.Payload.Request.PostsRequest.UpdatePostByIdRequest;
 import com.example.MindConnect.Payload.Response.PostsResponse.*;
 import com.example.MindConnect.Service.PostServiceImpl;
@@ -12,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/post")
+@RequestMapping("/api/posts")
 @RequiredArgsConstructor
 
 
@@ -34,6 +33,11 @@ public class PostController {
         return postService.getPostsById(id);
     }
 
+    @GetMapping("/feed")
+    public List<GetPostsByVisibilityResponse> getFeedPosts() {
+        return postService.getFeedPosts();
+    }
+
     @GetMapping
     public List<GetAllPostsResponse> getAllPosts(){
         return postService.getAllPosts();
@@ -50,10 +54,10 @@ public class PostController {
         return postService.updatePosts(request);
     }
 
-    @DeleteMapping("/delete-post")
-    public DeletePostResponse deletePost(@RequestBody DeletePostRequest request){
+    @DeleteMapping("/delete-post/{id}")
+    public DeletePostResponse deletePost(@PathVariable UUID id){
 
-        return postService.deletePosts(request.getId());
+        return postService.deletePosts(id);
     }
 
 
