@@ -1,154 +1,186 @@
-# Student Curriculum AI
+# MindConnect Backend
 
-Student Curriculum AI is an AI-powered academic planning platform built with Django that helps students navigate their degree requirements, monitor academic progress, and make informed decisions about future coursework. By analyzing completed courses and curriculum requirements, the application generates personalized course recommendations and academic guidance using OpenAI.
+MindConnect is a RESTful social media platform focused on mental wellness and community support. This repository contains the backend API built with Spring Boot, providing secure authentication, user management, post interactions, comments, likes, refresh tokens, email verification, and AWS S3 integration for profile images.
 
-The platform combines full-stack web development, Firebase Authentication, and artificial intelligence to provide an intelligent advising experience that simplifies curriculum planning and helps students stay on track toward graduation.
+The backend follows a layered architecture using Controllers, Services, Repositories, DTOs, and Entity classes while implementing JWT authentication and role-based authorization.
 
 ---
 
 ## Features
 
-### AI-Powered Academic Advising
+### Authentication
+- User registration
+- User login
+- JWT Authentication
+- Refresh Token Authentication
+- Email verification
+- OTP password reset
+- BCrypt password encryption
 
-- Personalized course recommendations based on completed coursework
-- AI-generated academic guidance for semester planning
-- Intelligent curriculum navigation
-- Degree progression analysis using OpenAI
-- Personalized recommendations tailored to each student's academic history
+### User Management
+- View current authenticated user
+- Update user information
+- Upload profile picture
+- Private profile image storage using AWS S3
+- Presigned URL generation for secure image access
+- Account status validation
+    - Active
+    - Inactive
+    - Suspended
+    - Frozen
+    - Deactivated
 
-### Student Management
+### Posts
+- Create posts
+- Update posts
+- Delete posts
+- View public posts
+- View posts by visibility
+- User-specific posts
 
-- Student registration and authentication
-- Secure login with Firebase Authentication
-- Student profile management
-- Personalized dashboard
+### Comments
+- Create comments
+- Update comments
+- Delete comments
+- Retrieve comments for posts
 
-### Curriculum Planning
+### Likes
+- Like posts
+- Unlike posts
+- Prevent duplicate likes
 
-- Track completed courses
-- Plan future semesters
-- Monitor degree progress
-- View curriculum requirements
-- Organize academic plans
+### Security
+- Spring Security
+- JWT Access Tokens
+- Refresh Tokens
+- Authentication Filter
+- Authorization Rules
+- Password Encryption
 
-### Backend Functionality
+### Exception Handling
+Global exception handling provides consistent API responses for:
 
-- Django MVC architecture
-- Firebase integration
-- Secure authentication
-- Database management
-- Form validation
-- Modular application design
-
----
-
-## Technology Stack
-
-| Category | Technologies |
-|----------|--------------|
-| Language | Python |
-| Framework | Django |
-| Authentication | Firebase Authentication |
-| Artificial Intelligence | OpenAI API |
-| Database | SQLite |
-| Frontend | HTML, CSS, JavaScript |
-| Additional Services | Firebase |
-
----
-
-## How It Works
-
-1. Students create an account using Firebase Authentication.
-2. Completed coursework and academic information are stored securely.
-3. The application compares completed courses with degree requirements.
-4. OpenAI analyzes the student's academic progress.
-5. Personalized course recommendations and academic guidance are generated.
-6. Students use these recommendations to build future semester schedules and monitor graduation progress.
-
----
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11+
-- Django
-- Firebase Project
-- OpenAI API Key
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/Lennox212/Student-Curriculum-AI.git
-```
-
-### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### Configure Environment Variables
-
-Create a `.env` file:
-
-```env
-OPENAI_API_KEY=your_openai_api_key
-FIREBASE_CREDENTIALS=your_firebase_credentials
-```
-
-### Run the Application
-
-```bash
-python manage.py migrate
-python manage.py runserver
-```
-
-The application will be available at:
-
-```
-http://127.0.0.1:8000
-```
+- Authentication errors
+- Invalid credentials
+- Invalid OTP
+- Unauthorized access
+- Missing resources
+- Validation failures
+- Account restrictions
 
 ---
 
-## Skills Demonstrated
+## Technologies
 
-- Python
-- Django
-- Firebase Authentication
-- OpenAI API Integration
-- Full-Stack Web Development
-- Database Design
-- Authentication & Authorization
-- AI-Assisted Decision Support
-- Software Architecture
+### Backend
+
+- Java 17
+- Spring Boot
+- Spring Security
+- Spring Data JPA
+- Hibernate
+- Maven
+
+### Database
+
+- MySQL
+
+### Authentication
+
+- JWT
+- Refresh Tokens
+- BCrypt
+
+### Cloud
+
+- AWS S3
+- Presigned URLs
+
+### Email
+
+- Java Mail Sender
+- Gmail SMTP
 
 ---
 
-## Future Enhancements
+## Project Structure
 
-- Interactive degree progress visualization
-- Multi-university curriculum support
-- Faculty and advisor portal
-- AI chat assistant
-- Automatic prerequisite validation
-- Exportable academic plans
-- Docker deployment
-- Unit and integration testing
+```
+src
+├── config
+├── controller
+├── customexceptions
+├── entity
+├── exceptionhandler
+├── payload
+│   ├── request
+│   └── response
+├── repository
+├── service
+└── utils
+```
 
 ---
 
-## About
+## Security
 
-Student Curriculum AI was developed as part of my software engineering portfolio to demonstrate the integration of artificial intelligence into a real-world educational platform. The application combines Django, Firebase, and OpenAI to provide personalized academic recommendations and streamline curriculum planning.
+Sensitive configuration values are stored using environment variables.
+
+Examples include:
+
+```
+DB_PASSWORD
+JWT_SECRET
+MAIL_USERNAME
+MAIL_PASSWORD
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_REGION
+AWS_S3_BUCKET_NAME
+```
+
+---
+
+## API Features
+
+- RESTful architecture
+- DTO-based request and response models
+- Layered architecture
+- Repository pattern
+- Dependency Injection
+- Global exception handling
+- Secure authentication and authorization
+
+---
+
+## Future Improvements
+
+- Direct Messaging
+- Friend System
+- Groups
+- Notifications
+- Content Moderation
+- Search
+- Pagination
+- Admin Dashboard
+
+---
+
+## Frontend
+
+The React frontend for this project is maintained in a separate repository.
+
+```
+MindConnect Frontend
+```
 
 ---
 
 ## Author
 
-**Lennox Rivera**
+Lennox Rivera
 
 Computer Engineering Graduate
 
-Java • Python • Django • Spring Boot • AI Integration • Full-Stack Development
+GitHub:
+https://github.com/Lennox212
