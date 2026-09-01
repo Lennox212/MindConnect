@@ -94,6 +94,9 @@ public class UserEntity extends BaseClass{
 
     private String profilePictureKey;
 
+    @Size(max = 300, message = "Bio cannot exceed 300 characters")
+    private String bio;
+
 
 
 

@@ -77,8 +77,8 @@ public OtpResponse changePassword(@RequestBody ChangePasswordRequest request){
     return userService.changePassword(request);
 }
 
-@PostMapping("/update-profile")
-public OtpResponse updateProfile(@RequestBody UpdateProfileRequest request){
+@PutMapping("/update-profile")
+public GetCurrentUserResponse updateProfile(@RequestBody UpdateProfileRequest request){
     return userService.updateProfile(request);
 }
 
@@ -103,6 +103,11 @@ public OtpResponse logOut(@RequestBody RefreshTokenRequest request){
 public UpdateProfilePictureResponse updateProfilePicture(@RequestParam("profilePicture") MultipartFile profilePicture){
 
     return userService.updateProfilePicture(profilePicture);
+}
+
+@GetMapping("/profile/{userID}")
+    public PublicProfileResponse getPublicProfile(@PathVariable UUID userID){
+    return userService.getPublicProfile(userID);
 }
 
 

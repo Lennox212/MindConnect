@@ -16,4 +16,6 @@ public class UpdateProfileRequest {
     private String gender;
 
     private String mentalCondition;
+
+    private String bio;
 }

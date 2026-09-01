@@ -13,8 +13,8 @@ public interface MessageRepository extends JpaRepository<MessageEntity, UUID> {
 Optional<MessageEntity> findById(UUID id);
 List<MessageEntity> findBySenderAndRecipientOrSenderAndRecipient(UserEntity sender, UserEntity recipient, UserEntity receiver, UserEntity messenger);
 List<MessageEntity> findBySenderOrRecipient(UserEntity user, UserEntity recipient);
-Long countBySenderAndRecipientAndIsReadFalse(UserEntity user, UserEntity recipient);
-long countByRecipientAndIsReadFalse(UserEntity recipient);
+Long countBySenderAndRecipientAndIsReadFalseAndDeletedByRecipientFalse(UserEntity user, UserEntity recipient);
+long countByRecipientAndIsReadFalseAndDeletedByRecipientFalse(UserEntity recipient);
 
 
 }

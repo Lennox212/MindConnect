@@ -13,6 +13,8 @@ public class GetPostsByVisibilityResponse {
 
     private UUID postID;
 
+    private UUID authorID;
+
     private String authorName;
 
     private String content;

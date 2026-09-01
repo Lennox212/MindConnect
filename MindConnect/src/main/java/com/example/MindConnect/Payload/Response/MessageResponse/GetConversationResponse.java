@@ -18,6 +18,10 @@ public class GetConversationResponse {
 
     private UUID messageID;
 
+    private UUID senderID;
+
+    private UUID recipientID;
+
     private String senderName;
 
     private String recipientName;

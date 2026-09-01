@@ -6,16 +6,18 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-
 @Data
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 
-public class UpdateProfilePictureResponse {
+public class UpdateProfileResponse {
+
     private String message;
 
-    private LocalDateTime localDateTime;
+    private String email;
 
-    private String profilePictureUrl;
+    private LocalDateTime timestamp;
+
+
 }

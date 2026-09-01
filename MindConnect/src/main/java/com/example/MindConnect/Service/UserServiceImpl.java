@@ -55,7 +55,6 @@ public class UserServiceImpl {
     public UserCreationResponse createUser(UserCreationRequest request) {
 
 
-
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new UserAlreadyExistsException("User with the provided details already exists");
         }
@@ -110,32 +109,26 @@ public class UserServiceImpl {
     public JwtResponse userLogin(LoginRequest loginRequest) {
 
 
-
         UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(()->new InvalidCredentialsException("Invalid credentials. Please try again"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials. Please try again"));
 
 
+        if (user.getStatus() == AccountStatus.INACTIVE) {
+            throw new AccountInactiveException("Account Inactive. Please check your email to active your account");
+        }
 
+        if (user.getStatus() == AccountStatus.FROZEN) {
 
+            throw new AccountFrozenException("Account Frozen. Please contact support!");
+        }
 
-            if (user.getStatus() == AccountStatus.INACTIVE) {
-                throw new AccountInactiveException("Account Inactive. Please check your email to active your account");
-            }
+        if (user.getStatus() == AccountStatus.SUSPENDED) {
+            throw new AccountSuspendedException("Account suspended. Please check your email for further instructions");
+        }
 
-            if (user.getStatus() == AccountStatus.FROZEN) {
-
-                throw new AccountFrozenException("Account Frozen. Please contact support!");
-            }
-
-            if (user.getStatus() == AccountStatus.SUSPENDED) {
-                throw new AccountSuspendedException("Account suspended. Please check your email for further instructions");
-            }
-
-            if(user.getStatus() == AccountStatus.DEACTIVATED) {
-                throw new AccountDeactivatedException("User disabled account.Please re-activate the account to regain access");
-            }
-
-
+        if (user.getStatus() == AccountStatus.DEACTIVATED) {
+            throw new AccountDeactivatedException("User disabled account.Please re-activate the account to regain access");
+        }
 
 
         Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())); //makes sure the info matches the info in database. Authenticates, tehn creates an object if truwe
@@ -160,32 +153,34 @@ public class UserServiceImpl {
     }
 
 
-
-    public UpdateProfilePictureResponse updateProfilePicture(MultipartFile picture){
+    public UpdateProfilePictureResponse updateProfilePicture(MultipartFile picture) {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()-> new UserNotFoundException("User does not exist"));
+                .orElseThrow(() -> new UserNotFoundException("User does not exist"));
 
         String oldObjectKey = user.getProfilePictureKey();
 
         String newObjectKey = s3Service.uploadFile(picture);
 
+
         try {
             user.setProfilePictureKey(newObjectKey);
             userRepository.save(user);
-        } catch (Exception exception){
+        } catch (Exception exception) {
 
             s3Service.deleteFile(newObjectKey);
 
             throw exception;
         }
 
+        String profilePictureUrl = s3Service.generatePresignedUrl(newObjectKey);
+
         if (oldObjectKey != null && !oldObjectKey.isBlank()) {
             try {
                 s3Service.deleteFile(oldObjectKey);
-            } catch (PictureUploadException exception){
+            } catch (PictureUploadException exception) {
                 log.error("Failed to delete old profile picture {}", oldObjectKey, exception);
             }
         }
@@ -193,17 +188,16 @@ public class UserServiceImpl {
 
         UpdateProfilePictureResponse response = UpdateProfilePictureResponse.builder()
                 .message("Profile picture updated successfully")
+                .profilePictureUrl(profilePictureUrl)
                 .localDateTime(LocalDateTime.now())
                 .build();
 
         return response;
 
 
-
-
     }
 
-    public JwtResponse refreshAccessToken(RefreshTokenRequest request){
+    public JwtResponse refreshAccessToken(RefreshTokenRequest request) {
 
         String refreshToken = request.getRefreshToken();
 
@@ -313,18 +307,19 @@ public class UserServiceImpl {
 
         return response;
     }
-    public OtpResponse changePassword(ChangePasswordRequest request){
+
+    public OtpResponse changePassword(ChangePasswordRequest request) {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName(); //get the username of
         //currently logged user
 
         UserEntity user = userRepository.findByEmail(email).
-                orElseThrow(()->new UserNotFoundException("Unable to locate the authenticated user account."));
+                orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
         Boolean match = passwordEncoder.matches(request.getOldPassword(), user.getPassword());
 
 
-        if(!match){
+        if (!match) {
             throw new PasswordDoesNotMatchException("Passwords do not match. Please try again");
         }
 
@@ -339,17 +334,17 @@ public class UserServiceImpl {
         return response;
     }
 
-    public OtpResponse updateProfile(UpdateProfileRequest request){
+    public GetCurrentUserResponse updateProfile(UpdateProfileRequest request) {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()-> new UserNotFoundException("Unable to locate the authenticated user account."));
+                .orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
 
-        if(request.getFirstName() != null) {
+        if (request.getFirstName() != null) {
 
-            if(request.getFirstName().isBlank()){
+            if (request.getFirstName().isBlank()) {
                 throw new BlankFieldException("First Name cannot be blank");
             }
 
@@ -357,67 +352,82 @@ public class UserServiceImpl {
         }
 
 
+        if (request.getLastName() != null) {
 
-        if(request.getLastName() != null) {
-
-            if(request.getLastName().isBlank()){
+            if (request.getLastName().isBlank()) {
                 throw new BlankFieldException("Last Name cannot be blank");
             }
 
             user.setLastName(request.getLastName());
         }
 
+        if (request.getBio() != null) {
+            user.setBio(request.getBio().trim());
+        }
 
 
-        if(request.getGender() != null) {
+        if (request.getGender() != null) {
             user.setGender(request.getGender());
         }
 
-        if(request.getMentalCondition() != null) {
+        if (request.getMentalCondition() != null) {
             user.setMentalCondition(request.getMentalCondition());
         }
 
-        userRepository.save(user);
+        UserEntity savedUser = userRepository.save(user);
 
-        OtpResponse response = OtpResponse.builder()
-                .email(user.getEmail())
-                .message("Profile updated successfully")
-                .timestamp(LocalDateTime.now())
+        String pictureUrl = null;
+
+        if (savedUser.getProfilePictureKey() != null &&
+                !savedUser.getProfilePictureKey().isBlank()) {
+
+            pictureUrl = s3Service.generatePresignedUrl(savedUser.getProfilePictureKey());
+
+
+        }
+        GetCurrentUserResponse response = GetCurrentUserResponse.builder()
+                .userID(savedUser.getId())
+                .firstName(savedUser.getFirstName())
+                .lastName(savedUser.getLastName())
+                .email(savedUser.getEmail())
+                .gender(savedUser.getGender())
+                .mentalCondition(savedUser.getMentalCondition())
+                .profilePictureUrl(pictureUrl)
+                .bio(savedUser.getBio())
+                .signUpDate(savedUser.getSignUpDate())
+                .status(savedUser.getStatus())
                 .build();
-
         return response;
-
-
     }
 
 
-    public OtpResponse deactivateAccount(DeactivateAccountRequest request){
+    public OtpResponse deactivateAccount(DeactivateAccountRequest request) {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new UserNotFoundException("Unable to locate the authenticated user account."));
+                .orElseThrow(() -> new UserNotFoundException("Unable to locate the authenticated user account."));
 
-        if(user.getStatus() == AccountStatus.DEACTIVATED){
+        if (user.getStatus() == AccountStatus.DEACTIVATED) {
             throw new AccountDeactivatedException("Account has already been deactivated");
         }
 
         boolean match = passwordEncoder.matches(request.getPasswordConfirmation(), user.getPassword());
 
-        if(!match){
+        if (!match) {
             throw new PasswordDoesNotMatchException("The password entered does not match your current password.");
         }
 
-            AccountDeactivationEntity deactivation = AccountDeactivationEntity.builder()
-                    .user(user)
-                    .reason(request.getReason())
-                    .deactivatedAt(LocalDateTime.now())
-                    .status(AccountStatus.DEACTIVATED)
-                    .build();
-            deactivationRepository.save(deactivation);
+        AccountDeactivationEntity deactivation = AccountDeactivationEntity.builder()
+                .user(user)
+                .reason(request.getReason())
+                .deactivatedAt(LocalDateTime.now())
+                .status(AccountStatus.DEACTIVATED)
+                .build();
+        deactivationRepository.save(deactivation);
 
-            user.setStatus(AccountStatus.DEACTIVATED);
-            userRepository.save(user);
+        user.setStatus(AccountStatus.DEACTIVATED);
+        userRepository.save(user);
 
         OtpResponse response = OtpResponse.builder()
                 .email(user.getEmail())
@@ -428,22 +438,21 @@ public class UserServiceImpl {
         return response;
     }
 
-    public GetCurrentUserResponse getCurrentUser(){
+    public GetCurrentUserResponse getCurrentUser() {
 
         String email = SecurityContextHolder.getContext()
                 .getAuthentication().getName();
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(()->new UserNotFoundException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         String pictureUrl = null;
 
         if (user.getProfilePictureKey() != null &&
-        !user.getProfilePictureKey().isBlank()){
+                !user.getProfilePictureKey().isBlank()) {
 
             pictureUrl = s3Service.generatePresignedUrl(user.getProfilePictureKey());
         }
-
 
 
         GetCurrentUserResponse response = GetCurrentUserResponse.builder()
@@ -452,6 +461,7 @@ public class UserServiceImpl {
                 .lastName(user.getLastName())
                 .email(user.getEmail())
                 .profilePictureUrl(pictureUrl)
+                .bio(user.getBio())
                 .signUpDate(user.getSignUpDate())
                 .status(user.getStatus())
                 .build();
@@ -460,7 +470,7 @@ public class UserServiceImpl {
 
     }
 
-    public OtpResponse logOut(RefreshTokenRequest request){
+    public OtpResponse logOut(RefreshTokenRequest request) {
 
         String token = request.getRefreshToken();
 
@@ -468,13 +478,34 @@ public class UserServiceImpl {
 
         SecurityContextHolder.clearContext();
 
-         OtpResponse response = OtpResponse.builder()
-                 .message("Log out successful")
-                 .timestamp(LocalDateTime.now())
-                 .build();
+        OtpResponse response = OtpResponse.builder()
+                .message("Log out successful")
+                .timestamp(LocalDateTime.now())
+                .build();
 
         return response;
     }
 
+    public PublicProfileResponse getPublicProfile(UUID id) {
 
+        UserEntity user = userRepository.findById(id).orElseThrow(() -> new UserNotFoundException("User Profile not found"));
+
+        String pictureUrl = null;
+
+        if (user.getProfilePictureKey() != null
+                && !user.getProfilePictureKey().isBlank()) {
+
+            pictureUrl = s3Service.generatePresignedUrl(user.getProfilePictureKey());
+        }
+
+        PublicProfileResponse response = PublicProfileResponse.builder()
+                .userID(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .profilePictureUrl(pictureUrl)
+                .bio(user.getBio())
+                .signUpDate(user.getSignUpDate())
+                .build();
+        return response;
+    }
 }

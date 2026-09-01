@@ -74,6 +74,8 @@ public class MessageServiceImpl {
 
         SendMessageResponse response = SendMessageResponse.builder()
                 .messageID(saved_message.getId())
+                .senderID(saved_message.getSender().getId())
+                .recipientID(saved_message.getRecipient().getId())
                 .senderName(sender.getFirstName() + " " + sender.getLastName())
                 .recipientName(recipient.getFirstName() + " " + recipient.getLastName())
                 .content(saved_message.getMessage())
@@ -92,23 +94,33 @@ public class MessageServiceImpl {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        UserEntity sender = userRepository.findByEmail(email)
+        UserEntity currentUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
 
-        if (sender.getStatus() != AccountStatus.ACTIVE) {
+        if (currentUser.getStatus() != AccountStatus.ACTIVE) {
             throw new RuntimeException("You cannot send messages at this time");
         }
 
-        UserEntity recipient = userRepository.findById(userID)
+        UserEntity otherUser = userRepository.findById(userID)
                 .orElseThrow(() -> new RuntimeException("Message recipient not found"));
 
-        if (recipient.getStatus() != AccountStatus.ACTIVE) {
+        if (otherUser.getStatus() != AccountStatus.ACTIVE) {
 
             throw new RuntimeException("This user cannot receive messages at this time");
         }
 
         List<MessageEntity> conversation = messageRepository.
-                findBySenderAndRecipientOrSenderAndRecipient(sender, recipient, recipient, sender);
+                findBySenderAndRecipientOrSenderAndRecipient(currentUser, otherUser, otherUser, currentUser);
+
+        conversation.removeIf(message -> {
+
+            boolean currentUserSentMessage = message.getSender().getId().equals(currentUser.getId());
+            if (currentUserSentMessage){
+                return message.isDeletedBySender();
+            }
+
+            return message.isDeletedByRecipient();
+        });
 
         List<GetConversationResponse> stored_conversations = new ArrayList<>();
 
@@ -126,6 +138,8 @@ public class MessageServiceImpl {
 
                 GetConversationResponse response = GetConversationResponse.builder()
                         .messageID(convo.getId())
+                        .senderID(convo.getSender().getId())
+                        .recipientID(convo.getRecipient().getId())
                         .senderName(convo.getSender().getFirstName() + " " + convo.getSender().getLastName())
                         .recipientName(convo.getRecipient().getFirstName() + " " + convo.getRecipient().getLastName())
                         .content(convo.getMessage())
@@ -158,6 +172,20 @@ public class MessageServiceImpl {
 
             List<MessageEntity> messages = messageRepository.findBySenderOrRecipient(user, user);
 
+            messages.removeIf(message -> {
+
+                boolean currentUserSentMessage =
+                        message.getSender()
+                                .getId()
+                                .equals(user.getId());
+
+                if (currentUserSentMessage) {
+                    return message.isDeletedBySender();
+                }
+
+                return message.isDeletedByRecipient();
+            });
+
             messages.sort(Comparator.comparing(MessageEntity::getSentAt).reversed()); //Descending
 
             List<GetMyChatsResponse> messages_list = new ArrayList<>();
@@ -187,7 +215,7 @@ public class MessageServiceImpl {
                         .otherUserName(otherUser.getFirstName() + " " + otherUser.getLastName())
                         .lastMessage(message.getMessage())
                         .lastMessageTime(message.getSentAt())
-                        .unreadCount(messageRepository.countBySenderAndRecipientAndIsReadFalse(otherUser,user))
+                        .unreadCount(messageRepository.countBySenderAndRecipientAndIsReadFalseAndDeletedByRecipientFalse(otherUser,user))
                         .build();
 
 
@@ -252,36 +280,68 @@ public class MessageServiceImpl {
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        UserEntity sender = userRepository.findByEmail(email)
+        UserEntity currentUser = userRepository.findByEmail(email)
                 .orElseThrow(()->new RuntimeException("Authenticated user not found"));
 
-        if(sender.getStatus() != AccountStatus.ACTIVE) {
+        if(currentUser.getStatus() != AccountStatus.ACTIVE) {
 
             throw new RuntimeException("You are not allowed to delete conversations at this time");
         }
 
-         UserEntity recipient = userRepository.findById(id)
+         UserEntity otherUser = userRepository.findById(id)
                  .orElseThrow(()->new RuntimeException("Recipient not found"));
 
-         List<MessageEntity> conversation = messageRepository.findBySenderAndRecipientOrSenderAndRecipient(sender, recipient,recipient,sender);
+         List<MessageEntity> conversation = messageRepository.findBySenderAndRecipientOrSenderAndRecipient(currentUser, otherUser, otherUser, currentUser);
 
          if(conversation.isEmpty()){
              throw new RuntimeException("Conversation not found");
          }
 
-         long count = conversation.size();
+            long deletedMessageCount = 0;
 
-         messageRepository.deleteAll(conversation);
+            for (MessageEntity message : conversation) {
 
-         DeleteConversationResponse response = DeleteConversationResponse.builder()
-                 .otherUserID(recipient.getId())
-                 .otherUserName(recipient.getFirstName() + " " + recipient.getLastName())
-                 .deletedAt(LocalDateTime.now())
-                 .deletedMessageCount(count)
-                 .status("Conversation has been successfully deleted")
-                 .build();
-         return response;
-        }
+                boolean currentUserSentMessage =
+                        message.getSender()
+                                .getId()
+                                .equals(currentUser.getId());
+
+                if (currentUserSentMessage) {
+
+                    if (!message.isDeletedBySender()) {
+                        message.setDeletedBySender(true);
+                        deletedMessageCount++;
+                    }
+
+                } else {
+
+                    if (!message.isDeletedByRecipient()) {
+                        message.setDeletedByRecipient(true);
+                        deletedMessageCount++;
+                    }
+                }
+            }
+
+            if (deletedMessageCount == 0) {
+                throw new RuntimeException(
+                        "Conversation is already deleted"
+                );
+            }
+
+
+            messageRepository.saveAll(conversation);
+
+             return DeleteConversationResponse.builder()
+                     .otherUserID(otherUser.getId())
+                     .otherUserName(otherUser.getFirstName() + " " + otherUser.getLastName())
+                     .deletedAt(LocalDateTime.now())
+                     .deletedMessageCount(deletedMessageCount)
+                     .status("Conversation removed from your messages")
+                     .build();
+
+         }
+
+
 
         public Long getUnreadMessages(){
 
@@ -295,7 +355,7 @@ public class MessageServiceImpl {
             throw new RuntimeException("You are not allowed to view messages at this time");
         }
 
-        Long count = messageRepository.countByRecipientAndIsReadFalse(recipient);
+        Long count = messageRepository.countByRecipientAndIsReadFalseAndDeletedByRecipientFalse(recipient);
 
         return count;
         }

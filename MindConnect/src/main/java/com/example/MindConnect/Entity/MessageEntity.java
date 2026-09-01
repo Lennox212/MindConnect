@@ -39,5 +39,11 @@ public class MessageEntity extends BaseClass{
 
     private boolean edited;
 
+    @Builder.Default
+    private boolean deletedBySender = false;
+
+    @Builder.Default
+    private boolean deletedByRecipient = false;
+
 
 }

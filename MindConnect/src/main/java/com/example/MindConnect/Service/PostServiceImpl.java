@@ -196,6 +196,7 @@ public class PostServiceImpl {
                                     + " "
                                     + post.getAuthor().getLastName()
                     )
+                    .authorID(post.getAuthor().getId())
                     .content(post.getContent())
                     .visibility(post.getVisibility())
                     .postedAt(post.getPostedAt())
